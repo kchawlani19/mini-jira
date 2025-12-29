@@ -1,0 +1,16 @@
+# Go build
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Go test
+*.test
+
+# Go coverage
+*.out
+
+# IDE
+.vscode/
+.idea/
