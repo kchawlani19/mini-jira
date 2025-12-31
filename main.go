@@ -2,20 +2,33 @@ package main
 
 import (
 	"fmt"
+	"net/http"
+
 	"mini-jira/handler"
+	"mini-jira/middleware"
 	"mini-jira/repository"
 	"mini-jira/service"
-	"net/http"
 )
 
 func main() {
 
-	userRepo := repository.NewUserRepository()
+	db := repository.NewMySQLDB()
+
+	var userRepo repository.UserRepository
+	userRepo = repository.NewMySQLUserRepository(db)
+
 	userService := service.NewUserService(userRepo)
+
 	userHandler := handler.NewUserHandler(userService)
+	authHandler := handler.NewAuthHandler(userService)
 
-	http.HandleFunc("/users", userHandler.CreateUser)
+	// PUBLIC ROUTES
+	http.HandleFunc("/login", authHandler.Login)
+	http.HandleFunc("/users", userHandler.CreateUser) // POST allowed without token
 
-	fmt.Println("MINI_JIRA server running on :8080")
+	// PROTECTED ROUTES
+	http.HandleFunc("/users/", middleware.JWTAuth(userHandler.CreateUser))
+
+	fmt.Println("Server running on :8080")
 	http.ListenAndServe(":8080", nil)
 }

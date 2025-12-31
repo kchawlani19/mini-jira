@@ -2,41 +2,56 @@ package handler
 
 import (
 	"encoding/json"
-	"mini-jira/service"
 	"net/http"
+
+	"golang.org/x/crypto/bcrypt"
+
+	"mini-jira/auth"
+	"mini-jira/service"
 )
 
-type LoginRequest struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
+type AuthHandler struct {
+	userService *service.UserService
 }
 
-type LoginResponse struct {
-	Message string `json:"message"`
+func NewAuthHandler(userService *service.UserService) *AuthHandler {
+	return &AuthHandler{userService: userService}
 }
 
-func LoginHandler(w http.ResponseWriter, r *http.Request) {
+func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
 
-	//body read
+	var req struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
 
-	var req LoginRequest
-	err := json.NewDecoder(r.Body).Decode(&req)
-	if err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
-	msg := service.Login(req.Email, req.Password)
-
-	resp := LoginResponse{
-		Message: msg,
+	user, err := h.userService.GetUserByEmail(req.Email)
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	if err := bcrypt.CompareHashAndPassword(
+		[]byte(user.Password),
+		[]byte(req.Password),
+	); err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	token, _ := auth.GenerateToken(user.ID)
+
+	json.NewEncoder(w).Encode(map[string]string{
+		"token": token,
+	})
 }
