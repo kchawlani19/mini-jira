@@ -17,14 +17,15 @@ func main() {
 
 	authHandler := &handlers.AuthHandler{Repo: userRepo}
 	taskHandler := &handlers.TaskHandler{Repo: taskRepo}
+	userHandler := &handlers.UserHandler{Repo: userRepo}
 
-	// public
 	http.HandleFunc("/register", authHandler.Register)
 	http.HandleFunc("/login", authHandler.Login)
 
-	// protected
-	http.HandleFunc("/tasks", middleware.JWTAuth(taskHandler.ServeHTTP))
-	http.HandleFunc("/tasks/", middleware.JWTAuth(taskHandler.ServeHTTP))
+	// ✅ STRUCT-BASED HANDLERS
+	http.Handle("/tasks", middleware.JWTAuth(taskHandler))
+	http.Handle("/tasks/", middleware.JWTAuth(taskHandler))
+	http.Handle("/users", middleware.JWTAuth(userHandler))
 
 	http.ListenAndServe(":8080", nil)
 }
