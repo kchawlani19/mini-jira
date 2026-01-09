@@ -1,77 +1,119 @@
 # Mini Jira Backend (Go + MySQL)
 
-Mini Jira is a backend-only implementation of a Jira-like issue tracking system
-built using **pure Go (net/http)** and **MySQL**, without using any web frameworks.
+Mini Jira is a backend-only implementation of a Jira-like issue tracking system,
+built using **pure Go (net/http)** and **MySQL**, without relying on any web frameworks.
 
-The project focuses on **backend fundamentals**, including authentication,
-authorization, ownership enforcement, and database integrity.
-
----
-
-## Why this project
-
-This project was built to demonstrate:
-- How real-world backend systems enforce rules
-- Clean separation between HTTP, business logic, and database layers
-- Secure handling of users, roles, and tasks
-- Correct use of database constraints instead of relying only on application code
+The project focuses on **backend fundamentals** such as authentication,
+authorization, ownership enforcement, database integrity, and clean architecture.
 
 ---
 
-## Core Features
+## Project Objective
 
-### Authentication & Authorization
+The goal of this project is to demonstrate how a real-world backend system is designed,
+where **rules are enforced at multiple layers** (API + database) and responsibilities
+are clearly separated.
+
+This is not a UI-driven project — it is intentionally backend-focused.
+
+---
+
+## Key Highlights (Why this project stands out)
+
+- No web frameworks — only standard Go libraries
+- Clear separation of concerns (HTTP, business logic, database)
+- Role-based access control (ADMIN vs USER)
+- Strict task ownership enforcement
+- Database-level constraints for data integrity
+- Soft delete strategy instead of hard deletes
+- Pagination implemented at database level
+- Designed with interview discussions in mind
+
+---
+
+## Authentication & Authorization
+
 - User registration and login
 - Password hashing
 - JWT-based authentication
 - Middleware-based request protection
+- Claims include user ID and role
 
 ### Roles
 - USER
 - ADMIN
 
-### Role-Based Access Control
-- USER can view and modify only tasks assigned to them
-- ADMIN can manage all tasks
-- ADMIN-only access to users list
+---
+
+## Role-Based Access Control
+
+USER:
+- Can create tasks (unassigned)
+- Can view only tasks assigned to them
+- Can update only their own tasks
+
+ADMIN:
+- Can view all tasks
+- Can assign tasks to users
+- Can update or delete any task
+- Can access users listing
+
+Authorization is enforced **before any database mutation**.
 
 ---
 
 ## Jira-like Task Workflow
 
 - Tasks are created **unassigned**
-- Only ADMIN can assign a task to a user
+- Only ADMIN can assign tasks
 - A USER can update a task only after it is assigned to them
-- Ownership is enforced using **database state**, not request payloads
+- Ownership is verified using database state
 - Task lifecycle:
   - OPEN
   - IN_PROGRESS
   - DONE
 
+This mirrors how task ownership works in real Jira-style systems.
+
 ---
 
-## Task Management
+## Task Management Features
 
 - Create tasks
 - Assign tasks (ADMIN only)
-- Update tasks (ownership enforced)
+- Update task details
 - Update task status
 - Soft delete tasks
 - Paginated task listing
 
 ---
 
-## Database Design (Important)
+## Soft Delete Strategy
 
-Database constraints are used to enforce correctness:
+Tasks are never physically removed from the database.
 
+Instead:
+- A `deleted_at` timestamp is used
+- Deleted tasks do not appear in GET APIs
+- Deleted tasks cannot be updated
+- DELETE returns 404 if the task does not exist
+
+This preserves data integrity and auditability.
+
+---
+
+## Database Design (Critical Part)
+
+The database is responsible for enforcing core rules, not just the application code.
+
+Key constraints:
 - Unique constraint on user email
 - Foreign key constraint on task assignee
 - ENUM-based task status
-- Indexes for frequently queried columns
-- Soft delete using `deleted_at` timestamp
+- Indexes on frequently queried columns
+- Soft delete handled at schema level
 
-These constraints ensure data integrity even in concurrent or failure scenarios.
+These constraints protect the system from race conditions and invalid data states.
 
 ---
 
@@ -118,7 +160,7 @@ Pagination is applied at the database level using LIMIT and OFFSET.
 ## Input Validation & Error Handling
 
 - Empty task titles are rejected
-- Invalid JSON payloads return appropriate errors
+- Invalid JSON payloads return proper error responses
 - Unauthorized and forbidden actions are handled consistently
 - REST-appropriate HTTP status codes are used
 
@@ -127,10 +169,10 @@ Pagination is applied at the database level using LIMIT and OFFSET.
 ## Tech Stack
 
 - Language: Go
-- HTTP: net/http
+- HTTP Server: net/http
 - Database: MySQL
 - Authentication: JWT
-- No web frameworks
+- No third-party web frameworks
 
 ---
 
@@ -172,16 +214,16 @@ Tasks:
 
 ## Testing
 
-APIs were tested using:
+The APIs were tested using:
 - Postman
 - PowerShell (Invoke-WebRequest)
 - curl.exe
 
-Test coverage includes:
+Test scenarios include:
 - Authentication failures
 - Role-based authorization
-- Ownership enforcement
-- Pagination behavior
+- Ownership violations
+- Pagination correctness
 - Soft delete behavior
 - Validation errors
 
@@ -189,11 +231,11 @@ Test coverage includes:
 
 ## Design Decisions
 
-- Database constraints are used to enforce critical rules
+- Database constraints are used to enforce correctness
 - Primary keys are immutable and never reused
 - No public users API for security reasons
 - Middleware is implemented using http.Handler (idiomatic Go)
-- Ownership is enforced before any state change
+- Business rules are validated before database updates
 
 ---
 
@@ -201,9 +243,20 @@ Test coverage includes:
 
 - Database migrations
 - Externalized configuration using environment variables
-- Improved observability and metrics
+- Containerization using Docker and Docker Compose
+- Observability and structured logging
 
 ---
 
+## Project Status
+
+✔ Feature complete  
+✔ Database integrity enforced  
+✔ Tested  
+✔ Interview-ready  
+
+---
+
+## License
 
 MIT
