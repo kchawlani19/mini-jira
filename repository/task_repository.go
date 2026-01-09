@@ -9,25 +9,14 @@ type TaskRepository struct {
 	DB *sql.DB
 }
 
-// POST
 func (r *TaskRepository) Create(t models.Task) error {
-	tx, err := r.DB.Begin()
-	if err != nil {
-		return err
-	}
-
-	_, err = tx.Exec(
+	_, err := r.DB.Exec(
 		"INSERT INTO tasks(title,description,status,assignee_id) VALUES (?,?,?,?)",
 		t.Title, t.Description, t.Status, t.AssigneeID,
 	)
-	if err != nil {
-		tx.Rollback()
-		return err
-	}
-	return tx.Commit()
+	return err
 }
 
-// GET
 func (r *TaskRepository) GetAll() ([]models.Task, error) {
 	rows, err := r.DB.Query(
 		"SELECT id,title,description,status,assignee_id FROM tasks",
@@ -46,7 +35,6 @@ func (r *TaskRepository) GetAll() ([]models.Task, error) {
 	return tasks, nil
 }
 
-// PUT
 func (r *TaskRepository) Update(id int, t models.Task) error {
 	_, err := r.DB.Exec(
 		"UPDATE tasks SET title=?,description=?,status=?,assignee_id=? WHERE id=?",
@@ -55,7 +43,6 @@ func (r *TaskRepository) Update(id int, t models.Task) error {
 	return err
 }
 
-// PATCH
 func (r *TaskRepository) PatchStatus(id int, status string) error {
 	_, err := r.DB.Exec(
 		"UPDATE tasks SET status=? WHERE id=?", status, id,
@@ -63,8 +50,24 @@ func (r *TaskRepository) PatchStatus(id int, status string) error {
 	return err
 }
 
-// DELETE
 func (r *TaskRepository) Delete(id int) error {
 	_, err := r.DB.Exec("DELETE FROM tasks WHERE id=?", id)
 	return err
+}
+
+// 🔐 OWNERSHIP CHECK
+func (r *TaskRepository) IsOwner(taskID int, userID int) (bool, error) {
+	var assigneeID *int
+	err := r.DB.QueryRow(
+		"SELECT assignee_id FROM tasks WHERE id=?",
+		taskID,
+	).Scan(&assigneeID)
+
+	if err != nil {
+		return false, err
+	}
+	if assigneeID == nil {
+		return false, nil
+	}
+	return *assigneeID == userID, nil
 }

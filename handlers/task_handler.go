@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"test_mini_jira/middleware"
 	"test_mini_jira/models"
 	"test_mini_jira/repository"
 	"test_mini_jira/utils"
@@ -18,41 +19,54 @@ type TaskHandler struct {
 func (h *TaskHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	idStr := strings.Trim(strings.TrimPrefix(r.URL.Path, "/tasks"), "/")
 
+	userID := r.Context().Value(middleware.UserIDKey).(int)
+	role := r.Context().Value(middleware.RoleKey).(string)
+
 	switch r.Method {
 
 	case http.MethodPost:
 		var t models.Task
 		json.NewDecoder(r.Body).Decode(&t)
-		if err := h.Repo.Create(t); err != nil {
-			utils.JSONError(w, 500, "db error")
+
+		// USER cannot assign task to someone else
+		if role != "ADMIN" && t.AssigneeID != nil && *t.AssigneeID != userID {
+			utils.JSONError(w, 403, "only admin can assign tasks")
 			return
 		}
+
+		h.Repo.Create(t)
 		w.WriteHeader(http.StatusCreated)
 
 	case http.MethodGet:
-		tasks, err := h.Repo.GetAll()
-		if err != nil {
-			utils.JSONError(w, 500, "db error")
-			return
-		}
+		tasks, _ := h.Repo.GetAll()
 		json.NewEncoder(w).Encode(tasks)
 
 	case http.MethodPut:
-		id, err := strconv.Atoi(idStr)
-		if err != nil {
-			utils.JSONError(w, 400, "invalid id")
-			return
+		id, _ := strconv.Atoi(idStr)
+
+		if role != "ADMIN" {
+			ok, _ := h.Repo.IsOwner(id, userID)
+			if !ok {
+				utils.JSONError(w, 403, "not allowed to update this task")
+				return
+			}
 		}
+
 		var t models.Task
 		json.NewDecoder(r.Body).Decode(&t)
 		h.Repo.Update(id, t)
 
 	case http.MethodPatch:
-		id, err := strconv.Atoi(idStr)
-		if err != nil {
-			utils.JSONError(w, 400, "invalid id")
-			return
+		id, _ := strconv.Atoi(idStr)
+
+		if role != "ADMIN" {
+			ok, _ := h.Repo.IsOwner(id, userID)
+			if !ok {
+				utils.JSONError(w, 403, "not allowed to update this task")
+				return
+			}
 		}
+
 		var b struct {
 			Status string `json:"status"`
 		}
@@ -60,11 +74,16 @@ func (h *TaskHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.Repo.PatchStatus(id, b.Status)
 
 	case http.MethodDelete:
-		id, err := strconv.Atoi(idStr)
-		if err != nil {
-			utils.JSONError(w, 400, "invalid id")
-			return
+		id, _ := strconv.Atoi(idStr)
+
+		if role != "ADMIN" {
+			ok, _ := h.Repo.IsOwner(id, userID)
+			if !ok {
+				utils.JSONError(w, 403, "not allowed to delete this task")
+				return
+			}
 		}
+
 		h.Repo.Delete(id)
 
 	default:

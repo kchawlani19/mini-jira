@@ -1,12 +1,20 @@
 package middleware
 
 import (
+	"context"
 	"net/http"
 	"strings"
 
 	"test_mini_jira/utils"
 
 	"github.com/golang-jwt/jwt/v5"
+)
+
+type contextKey string
+
+const (
+	UserIDKey contextKey = "userID"
+	RoleKey   contextKey = "role"
 )
 
 func JWTAuth(next http.HandlerFunc) http.HandlerFunc {
@@ -25,12 +33,14 @@ func JWTAuth(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		// optional: extract claims
-		if claims, ok := token.Claims.(jwt.MapClaims); ok {
-			_ = claims["user_id"] // future use
-			_ = claims["role"]
-		}
+		claims := token.Claims.(jwt.MapClaims)
 
-		next(w, r)
+		userID := int(claims["user_id"].(float64))
+		role := claims["role"].(string)
+
+		ctx := context.WithValue(r.Context(), UserIDKey, userID)
+		ctx = context.WithValue(ctx, RoleKey, role)
+
+		next(w, r.WithContext(ctx))
 	}
 }
