@@ -248,15 +248,4 @@ Test scenarios include:
 
 ---
 
-## Project Status
 
-✔ Feature complete  
-✔ Database integrity enforced  
-✔ Tested  
-✔ Interview-ready  
-
----
-
-## License
-
-MIT
