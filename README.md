@@ -1,20 +1,20 @@
 # Mini Jira Backend (Go + MySQL)
 
-Mini Jira is a backend-only implementation of a Jira-like issue tracking system.
-The project is built using pure Go (`net/http`) and MySQL, without using any web frameworks.
+Mini Jira is a backend-only implementation of a Jira-like issue tracking system
+built using **pure Go (net/http)** and **MySQL**, without using any web frameworks.
 
-The focus of this project is correct backend design, authentication and authorization,
-data integrity, and real-world API behavior.
+The project focuses on **backend fundamentals**, including authentication,
+authorization, ownership enforcement, and database integrity.
 
 ---
 
-## Project Goals
+## Why this project
 
-- Build a production-style backend using standard Go libraries
-- Implement role-based access control and ownership rules
-- Follow real Jira-like workflows instead of shortcuts
-- Handle edge cases correctly (validation, authorization, deletion)
-- Keep the architecture simple, readable, and extensible
+This project was built to demonstrate:
+- How real-world backend systems enforce rules
+- Clean separation between HTTP, business logic, and database layers
+- Secure handling of users, roles, and tasks
+- Correct use of database constraints instead of relying only on application code
 
 ---
 
@@ -31,19 +31,18 @@ data integrity, and real-world API behavior.
 - ADMIN
 
 ### Role-Based Access Control
-- USER and ADMIN can register and log in
-- USER can only see and modify tasks assigned to them
-- ADMIN can view and manage all tasks
+- USER can view and modify only tasks assigned to them
+- ADMIN can manage all tasks
 - ADMIN-only access to users list
 
 ---
 
-## Task Workflow (Jira-like)
+## Jira-like Task Workflow
 
 - Tasks are created **unassigned**
 - Only ADMIN can assign a task to a user
-- A USER can modify a task only after it is assigned to them
-- Ownership is enforced using database state, not request body
+- A USER can update a task only after it is assigned to them
+- Ownership is enforced using **database state**, not request payloads
 - Task lifecycle:
   - OPEN
   - IN_PROGRESS
@@ -51,7 +50,7 @@ data integrity, and real-world API behavior.
 
 ---
 
-## Task Management Features
+## Task Management
 
 - Create tasks
 - Assign tasks (ADMIN only)
@@ -62,19 +61,47 @@ data integrity, and real-world API behavior.
 
 ---
 
-## Soft Delete Strategy
+## Database Design (Important)
 
-Tasks are never permanently removed from the database.
+Database constraints are used to enforce correctness:
 
-Instead:
-- A `deleted_at` timestamp is used
-- Deleted tasks:
-  - Do not appear in GET APIs
-  - Cannot be updated
-  - Preserve historical data
-- DELETE returns:
-  - 200 for successful delete
-  - 404 if task does not exist or is already deleted
+- Unique constraint on user email
+- Foreign key constraint on task assignee
+- ENUM-based task status
+- Indexes for frequently queried columns
+- Soft delete using `deleted_at` timestamp
+
+These constraints ensure data integrity even in concurrent or failure scenarios.
+
+---
+
+## Database Schema
+
+CREATE DATABASE IF NOT EXISTS mini_jira;
+USE mini_jira;
+
+CREATE TABLE users (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    password VARCHAR(255) NOT NULL,
+    role ENUM('USER','ADMIN') NOT NULL DEFAULT 'USER',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE tasks (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    status ENUM('OPEN','IN_PROGRESS','DONE') NOT NULL DEFAULT 'OPEN',
+    assignee_id INT NULL,
+    deleted_at TIMESTAMP NULL DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (assignee_id) REFERENCES users(id) ON DELETE SET NULL
+);
+
+CREATE INDEX idx_tasks_assignee ON tasks(assignee_id);
+CREATE INDEX idx_tasks_status ON tasks(status);
+CREATE INDEX idx_tasks_deleted ON tasks(deleted_at);
 
 ---
 
@@ -84,17 +111,16 @@ Task listing APIs support pagination using query parameters:
 
 ?page=1&limit=10
 
-- Pagination is applied at database level using LIMIT and OFFSET
-- Defaults are applied if parameters are missing or invalid
+Pagination is applied at the database level using LIMIT and OFFSET.
 
 ---
 
 ## Input Validation & Error Handling
 
 - Empty task titles are rejected
-- Invalid JSON payloads return proper errors
+- Invalid JSON payloads return appropriate errors
 - Unauthorized and forbidden actions are handled consistently
-- HTTP status codes follow REST conventions
+- REST-appropriate HTTP status codes are used
 
 ---
 
@@ -104,31 +130,7 @@ Task listing APIs support pagination using query parameters:
 - HTTP: net/http
 - Database: MySQL
 - Authentication: JWT
-- No third-party web frameworks
-
----
-
-## Database Schema
-
-CREATE DATABASE mini_jira;
-USE mini_jira;
-
-CREATE TABLE users (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    email VARCHAR(255) UNIQUE NOT NULL,
-    password VARCHAR(255) NOT NULL,
-    role ENUM('USER','ADMIN') DEFAULT 'USER'
-);
-
-CREATE TABLE tasks (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    title VARCHAR(255) NOT NULL,
-    description TEXT,
-    status ENUM('OPEN','IN_PROGRESS','DONE') DEFAULT 'OPEN',
-    assignee_id INT,
-    deleted_at TIMESTAMP NULL DEFAULT NULL,
-    FOREIGN KEY (assignee_id) REFERENCES users(id) ON DELETE SET NULL
-);
+- No web frameworks
 
 ---
 
@@ -150,7 +152,7 @@ http://localhost:8080
 
 ---
 
-## API Endpoints
+## API Overview
 
 Authentication:
 - POST /register
@@ -170,16 +172,16 @@ Tasks:
 
 ## Testing
 
-The API was tested using:
+APIs were tested using:
 - Postman
 - PowerShell (Invoke-WebRequest)
 - curl.exe
 
-Test cases covered:
+Test coverage includes:
 - Authentication failures
 - Role-based authorization
-- Ownership violations
-- Pagination
+- Ownership enforcement
+- Pagination behavior
 - Soft delete behavior
 - Validation errors
 
@@ -187,14 +189,21 @@ Test cases covered:
 
 ## Design Decisions
 
+- Database constraints are used to enforce critical rules
 - Primary keys are immutable and never reused
 - No public users API for security reasons
 - Middleware is implemented using http.Handler (idiomatic Go)
-- Ownership checks rely on database state
-- No hidden side effects in request payloads
+- Ownership is enforced before any state change
+
+---
+
+## Future Improvements
+
+- Database migrations
+- Externalized configuration using environment variables
+- Improved observability and metrics
 
 ---
 
 
-
-
+MIT
